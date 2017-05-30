@@ -3,6 +3,7 @@
 #![cfg_attr(test, plugin(quickcheck_macros))]
 #![cfg_attr(test, feature(custom_attribute))]
 #![feature(const_fn)]
+#![feature(specialization)]
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
@@ -22,29 +23,26 @@ pub mod ser;
 pub mod de;
 pub mod primitive;
 
-use info::Asn1Info;
-
 
 #[cfg(test)]
 mod tests {
     use test;
     use super::*;
-    use super::info::Tag;
+    use super::info::{Tag, Asn1Tagged};
     use super::ser::{self, der, Serialize as Asn1Serialize, Serializer as Asn1Serializer,
                      RawEncoder as Asn1Raw, StructSerializer as Asn1StructSerializer};
 
     #[derive(Debug)]
     struct TestStruct(i8, i32, i32);
-    asn1_info!(TestStruct, [APPLICATION 30], "TEST");
+    asn1_info!(TestStruct => [APPLICATION 30], "TEST");
 
     #[derive(Debug)]
     struct TestStruct2<'a>(&'a TestStruct, &'a TestStruct);
-    asn1_info!(TestStruct2<'a>: ('a), [APPLICATION 31], "TEST2");
+    asn1_info!(TestStruct2<'a>: ('a) => [APPLICATION 31], "TEST2");
 
     impl ser::Serialize for TestStruct {
         fn asn1_serialize<S: ser::Serializer>(&self, s: S) -> Result<S::Ok, S::Err> {
-            let tag = Self::asn1_tag().unwrap();
-            self._asn1_serialize_tagged(s, tag)
+            self._asn1_serialize_tagged(s, Self::asn1_tag())
         }
 
         fn _asn1_serialize_tagged<S: ser::Serializer>(&self,
@@ -61,8 +59,7 @@ mod tests {
 
     impl<'a> ser::Serialize for TestStruct2<'a> {
         fn asn1_serialize<S: ser::Serializer>(&self, s: S) -> Result<S::Ok, S::Err> {
-            let tag = Self::asn1_tag().unwrap();
-            self._asn1_serialize_tagged(s, tag)
+            self._asn1_serialize_tagged(s, Self::asn1_tag())
         }
 
         fn _asn1_serialize_tagged<S: ser::Serializer>(&self,

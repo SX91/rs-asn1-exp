@@ -1,21 +1,20 @@
 // Module for BIT STRING
-use info::{Asn1Info, Tag, Len};
+use info::{Asn1Tagged, Tag, Len};
 
 use ser::{self, RawEncoder};
 
 #[derive(Debug, PartialEq, PartialOrd)]
-struct BitString {
+pub struct BitString {
     data: Vec<u8>,
     bitsize: usize,
 }
 
-asn1_info!(BitString, UNIVERSAL 3, "BIT STRING");
+asn1_info!(BitString => UNIVERSAL 3, "BIT STRING");
 
 impl ser::Serialize for BitString {
     fn asn1_serialize<S: ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Err> {
-        let tag = Self::asn1_tag().unwrap();
+        self._asn1_serialize_tagged(serializer, Self::asn1_tag())
 
-        self._asn1_serialize_tagged(serializer, tag)
     }
 
     fn _asn1_serialize_tagged<S: ser::Serializer>(&self, serializer: S, tag: &Tag) -> Result<S::Ok, S::Err> {

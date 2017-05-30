@@ -1,12 +1,11 @@
-use info::{Asn1Info, Tag};
+use info::{Asn1Tagged, Tag};
 use ser;
 
-asn1_info!(bool, UNIVERSAL 1, "BOOLEAN");
+asn1_info!(bool => UNIVERSAL 1, "BOOLEAN");
 
 impl ser::Serialize for bool {
     fn asn1_serialize<S: ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Err> {
-        let tag = Self::asn1_tag().unwrap();
-        self._asn1_serialize_tagged(serializer, tag)
+        self._asn1_serialize_tagged(serializer, Self::asn1_tag())
     }
 
     fn _asn1_serialize_tagged<S: ser::Serializer>(&self, serializer: S, tag: &Tag) -> Result<S::Ok, S::Err> {
@@ -18,11 +17,11 @@ impl ser::Serialize for bool {
 mod tests {
     use test;
     use ::ser::{der, Serialize as Asn1Serialize};
-    use ::info::{Asn1Info, Class};
+    use info::{Asn1Tagged, Class};
 
     #[test]
-    fn bool_tag() {
-        let tag = bool::asn1_tag().unwrap();
+    fn tag() {
+        let tag = bool::asn1_tag();
         assert_eq!(tag.class(), Class::Universal, "tag class check failed");
         assert_eq!(tag.tagnum(), 0x01, "tag num check failed");
         assert_eq!(tag.is_constructed(), false, "tag constructed flag check failed");

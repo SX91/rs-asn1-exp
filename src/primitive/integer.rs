@@ -1,12 +1,11 @@
-use info::{Asn1Info, Class, Tag};
+use info::{Asn1Tagged, Tag};
 use ser;
 
 macro_rules! encode_int {
     ($ty:ty => $($args:tt)+) => {
         impl ser::Serialize for $ty {
             fn asn1_serialize<S: ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Err> {
-                let tag = Self::asn1_tag().unwrap();
-                self._asn1_serialize_tagged(serializer, &tag)
+                self._asn1_serialize_tagged(serializer, Self::asn1_tag())
             }
 
             encode_int!{__impl $ty => $($args)*}
@@ -19,17 +18,18 @@ macro_rules! encode_int {
     };
 }
 
-asn1_info!(i8,    Class::Universal, 0x02, false, "INTEGER");
-asn1_info!(i16,   Class::Universal, 0x02, false, "INTEGER");
-asn1_info!(i32,   Class::Universal, 0x02, false, "INTEGER");
-asn1_info!(i64,   Class::Universal, 0x02, false, "INTEGER");
-asn1_info!(isize, Class::Universal, 0x02, false, "INTEGER");
 
-asn1_info!(u8,    Class::Universal, 0x02, false, "INTEGER");
-asn1_info!(u16,   Class::Universal, 0x02, false, "INTEGER");
-asn1_info!(u32,   Class::Universal, 0x02, false, "INTEGER");
-asn1_info!(u64,   Class::Universal, 0x02, false, "INTEGER");
-asn1_info!(usize, Class::Universal, 0x02, false, "INTEGER");
+asn1_info!(i8    => UNIVERSAL 0x02, "INTEGER");
+asn1_info!(i16   => UNIVERSAL 0x02, "INTEGER");
+asn1_info!(i32   => UNIVERSAL 0x02, "INTEGER");
+asn1_info!(i64   => UNIVERSAL 0x02, "INTEGER");
+asn1_info!(isize => UNIVERSAL 0x02, "INTEGER");
+
+asn1_info!(u8    => UNIVERSAL 0x02, "INTEGER");
+asn1_info!(u16   => UNIVERSAL 0x02, "INTEGER");
+asn1_info!(u32   => UNIVERSAL 0x02, "INTEGER");
+asn1_info!(u64   => UNIVERSAL 0x02, "INTEGER");
+asn1_info!(usize => UNIVERSAL 0x02, "INTEGER");
 
 encode_int!(i8 => serialize_i8);
 encode_int!(i16 => serialize_i16);
