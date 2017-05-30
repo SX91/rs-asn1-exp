@@ -1,5 +1,4 @@
-use std::io;
-use std::io::Result as IoResult;
+use std::io::{Result as IoResult, Read as IoRead, Error as IoError};
 
 use info::{Tag, Len, LenNum};
 
@@ -8,16 +7,16 @@ pub enum ReadError {
     InvalidTag,
     InvalidLength,
     InvalidValue,
-    IoError(io::Error),
+    IoError(IoError),
 }
 
-impl From<io::Error> for ReadError {
-    fn from(e: io::Error) -> Self {
+impl From<IoError> for ReadError {
+    fn from(e: IoError) -> Self {
         ReadError::IoError(e)
     }
 }
 
-fn read_byte<R: io::Read>(r: &mut R) -> IoResult<u8> {
+pub fn read_byte<R: IoRead>(r: &mut R) -> IoResult<u8> {
     let mut buf: [u8; 1] = [0; 1];
     r.read_exact(&mut buf[..])?;
     Ok(buf[0])
@@ -26,7 +25,7 @@ fn read_byte<R: io::Read>(r: &mut R) -> IoResult<u8> {
 macro_rules! read_integer {
     ($ident:ident: $ty:ty, $($args:tt)*) => {
         #[inline]
-        pub fn $ident<R: io::Read>(r: &mut R, len: LenNum) -> Result<$ty, ReadError> {
+        pub fn $ident<R: IoRead>(r: &mut R, len: LenNum) -> Result<$ty, ReadError> {
             read_integer!(__impl $ty, r, len, $($args)*)
         }
     };
@@ -95,7 +94,7 @@ read_integer!(read_u64: u64, 8, false);
 read_integer!(read_usize: usize, 8, false);
 
 #[inline]
-pub fn read_base128<R: io::Read>(r: &mut R) -> Result<u64, ReadError> {
+pub fn read_base128<R: IoRead>(r: &mut R) -> Result<u64, ReadError> {
     let mut i = 0;
 
     loop {
@@ -112,7 +111,7 @@ pub fn read_base128<R: io::Read>(r: &mut R) -> Result<u64, ReadError> {
 }
 
 #[inline]
-pub fn read_tag<R: io::Read>(r: &mut R) -> Result<Tag, ReadError> {
+pub fn read_tag<R: IoRead>(r: &mut R) -> Result<Tag, ReadError> {
     let tag_byte = read_byte(r)?;
     let class_num = (tag_byte & 0xc0) >> 6;
     let constructed = tag_byte & 0x20 == 0x20;
@@ -127,7 +126,7 @@ pub fn read_tag<R: io::Read>(r: &mut R) -> Result<Tag, ReadError> {
 }
 
 #[inline]
-pub fn read_len<R: io::Read>(r: &mut R) -> Result<Len, ReadError> {
+pub fn read_len<R: IoRead>(r: &mut R) -> Result<Len, ReadError> {
     let head = read_byte(r)?;
     let len: LenNum = head as LenNum & 0x7f;
 
@@ -141,7 +140,7 @@ pub fn read_len<R: io::Read>(r: &mut R) -> Result<Len, ReadError> {
 }
 
 #[inline]
-pub fn read_len_def<R: io::Read>(r: &mut R) -> Result<LenNum, ReadError> {
+pub fn read_len_def<R: IoRead>(r: &mut R) -> Result<LenNum, ReadError> {
     let l = read_byte(r)?;
 
     if l == 0x80 {
@@ -153,17 +152,48 @@ pub fn read_len_def<R: io::Read>(r: &mut R) -> Result<LenNum, ReadError> {
     }
 }
 
-pub fn read_header<R: io::Read>(r: &mut R) -> Result<(Tag, Len), ReadError> {
+pub fn read_header<R: IoRead>(r: &mut R) -> Result<(Tag, Len), ReadError> {
     let tag = read_tag(r)?;
     let len = read_len(r)?;
     Ok((tag, len))
+}
+
+pub fn read_boolean<R: IoRead>(r: &mut R, len: LenNum) -> Result<bool, ReadError> {
+    if len == 1 {
+        let byte = read_byte(r)?;
+        Ok(byte != 0)
+    } else {
+        Err(ReadError::InvalidLength)
+    }
+}
+
+pub fn read_bit_string<R: IoRead>(r: &mut R, len: LenNum) -> Result<(u8, Vec<u8>), ReadError> {
+    if len < 2 {
+        return Err(ReadError::InvalidLength);
+    }
+
+    let unused: u8 = read_u8(r, 1)?;
+    if unused > 7 {
+        return Err(ReadError::InvalidValue);
+    }
+
+    let mut buf: Vec<u8> = Vec::with_capacity(len);
+    r.take((len - 1) as u64).read_to_end(&mut buf)?;
+
+    Ok((unused, buf))
+}
+
+pub fn read_octet_string<R: IoRead>(r: &mut R, len: LenNum) -> Result<Vec<u8>, ReadError> {
+    let mut buf: Vec<u8> = Vec::with_capacity(len);
+    r.take(len as u64).read_to_end(&mut buf)?;
+    Ok(buf)
 }
 
 
 #[cfg(test)]
 #[allow(dead_code)]
 mod tests {
-    use std::io;
+    use std::io::{self, Error as IoError, ErrorKind as IoErrorKind};
 
     use super::*;
     use super::ReadError;
@@ -397,7 +427,7 @@ mod tests {
         let bytes = b"";
         let res = read_header(&mut &bytes[..]);
         match res {
-            Err(ReadError::IoError(ref err)) if err.kind() == io::ErrorKind::UnexpectedEof => {}
+            Err(ReadError::IoError(ref err)) if err.kind() == IoErrorKind::UnexpectedEof => {}
             _ => panic!("Expected UnexpectedEOf, got {:?}", res.unwrap_err()),
         }
     }
@@ -408,7 +438,7 @@ mod tests {
             .or(read_header(&mut &b"\x1f\x80"[..]))
             .or(read_header(&mut &b"\x1f\x80\x82"[..]));
         match res {
-            Err(ReadError::IoError(ref err)) if err.kind() == io::ErrorKind::UnexpectedEof => {}
+            Err(ReadError::IoError(ref err)) if err.kind() == IoErrorKind::UnexpectedEof => {}
             _ => panic!("Expected UnexpectedEOf, got {:?}", res.unwrap_err()),
         }
     }
@@ -419,7 +449,7 @@ mod tests {
             .or(read_header(&mut &b"\x30\x81"[..]))
             .or(read_header(&mut &b"\x30\x83\x01\x03"[..]));
         match res {
-            Err(ReadError::IoError(ref err)) if err.kind() == io::ErrorKind::UnexpectedEof => {}
+            Err(ReadError::IoError(ref err)) if err.kind() == IoErrorKind::UnexpectedEof => {}
             _ => panic!("Expected UnexpectedEOf, got {:?}", res.unwrap_err()),
         }
     }

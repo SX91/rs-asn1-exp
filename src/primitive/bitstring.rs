@@ -2,6 +2,7 @@
 use info::{Asn1Tagged, Tag, Len};
 
 use ser::{self, RawEncoder};
+use de::{self, RawDecoder};
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct BitString {
@@ -14,15 +15,32 @@ asn1_info!(BitString => UNIVERSAL 3, "BIT STRING");
 impl ser::Serialize for BitString {
     fn asn1_serialize<S: ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Err> {
         self._asn1_serialize_tagged(serializer, Self::asn1_tag())
-
     }
 
-    fn _asn1_serialize_tagged<S: ser::Serializer>(&self, serializer: S, tag: &Tag) -> Result<S::Ok, S::Err> {
-        let mut raw = serializer.serialize_raw()?;
-        let data_len = self.data.len();
-
-        raw.encode_header(tag, &Len::Def(self.data.len() + 1))?;
-        raw.encode_byte((data_len - self.bitsize) as u8)?;
-        raw.encode_bytes(self.data.as_slice())
+    fn _asn1_serialize_tagged<S: ser::Serializer>(&self,
+                                                  serializer: S,
+                                                  tag: &Tag)
+                                                  -> Result<S::Ok, S::Err> {
+        let unused = self.data.len() * 8 - self.bitsize;
+        serializer.serialize_bit_string(tag, (unused as u8, self.data.as_slice()))
     }
 }
+
+impl<'de> de::Deserialize<'de> for BitString {
+    fn asn1_deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Err> {
+        Self::_asn1_deserialize_tagged(deserializer, Self::asn1_tag())
+    }
+
+    fn _asn1_deserialize_tagged<D: de::Deserializer<'de>>(deserializer: D,
+                                                          tag: &Tag)
+                                                          -> Result<Self, D::Err> {
+        let (unused, data) = deserializer.deserialize_bit_string(tag)?;
+        let bitsize = data.len() * 8 - (unused as usize);
+
+        Ok(BitString {
+               data: data,
+               bitsize: bitsize,
+           })
+    }
+}
+

@@ -2,6 +2,8 @@ use info::{Tag, Len};
 
 pub trait Error: Sized {
     fn invalid_tag() -> Self;
+    fn invalid_value() -> Self;
+    fn prim_untagged() -> Self;
     fn custom(message: &str) -> Self;
 }
 
@@ -62,7 +64,7 @@ pub trait Serializer {
     fn serialize_f32(self, tag: &Tag, value: f32) -> Result<Self::Ok, Self::Err>;
     fn serialize_f64(self, tag: &Tag, value: f64) -> Result<Self::Ok, Self::Err>;
 
-    // fn serialize_bit_string(&mut self, tag: &Tag, unused: u8, value: &[u8]) -> Result<Self::Ok, Self::Err>;
+    fn serialize_bit_string(self, tag: &Tag, value: (u8, &[u8])) -> Result<Self::Ok, Self::Err>;
     fn serialize_bytes(self, tag: &Tag, value: &[u8]) -> Result<Self::Ok, Self::Err>;
     fn serialize_null(self, tag: &Tag) -> Result<Self::Ok, Self::Err>;
 

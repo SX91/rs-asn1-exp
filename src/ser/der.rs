@@ -10,6 +10,7 @@ pub enum EncodeError {
     InvalidTag,
     InvalidLength,
     InvalidValue,
+    PrimUntagged,
     Custom(String),
     GeneralIO(IoError),
 }
@@ -24,6 +25,14 @@ impl From<IoError> for EncodeError {
 impl ser::Error for EncodeError {
     fn invalid_tag() -> Self {
         EncodeError::InvalidTag
+    }
+
+    fn invalid_value() -> Self {
+        EncodeError::InvalidValue
+    }
+
+    fn prim_untagged() -> Self {
+        EncodeError::PrimUntagged
     }
 
     fn custom(message: &str) -> Self {
@@ -174,6 +183,16 @@ impl<'s, W: Write> ser::Serializer for &'s mut Serializer<W> {
     }
     fn serialize_f64(self, tag: &Tag, value: f64) -> Result<Self::Ok, Self::Err> {
         unimplemented!()
+    }
+
+    fn serialize_bit_string(self, tag: &Tag, value: (u8, &[u8])) -> Result<Self::Ok, Self::Err> {
+        let (unused, bytes) = value;
+        if unused < 8 {
+            write::write_bit_string(&mut self.writer, tag, unused, bytes)?;
+            Ok(())
+        } else {
+            Err(EncodeError::InvalidValue)
+        }
     }
 
     fn serialize_bytes(self, tag: &Tag, value: &[u8]) -> Result<Self::Ok, Self::Err> {
