@@ -1,0 +1,16 @@
+[package]
+name = "asn1-exp"
+version = "0.0.1"
+authors = ["Anton Kondrachkov <sx91@protonmail.com>"]
+description = "Experimental ASN.1 serialization/deserialization library."
+license = "MIT"
+
+[dependencies]
+clippy = {version = "*", optional = true}
+
+[dev-dependencies]
+quickcheck = "^0.4"
+quickcheck_macros = "^0.4"
+
+[features]
+default = ["clippy"]
