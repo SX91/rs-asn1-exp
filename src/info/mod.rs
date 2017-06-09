@@ -1,8 +1,10 @@
 pub mod tag;
+pub mod universal;
 
 
 pub use self::tag::{Class, Tag, Len, TagNum, LenNum};
 pub use self::tag::Class::*;
+pub use self::universal::*;
 
 pub trait Asn1Tagged {
     fn asn1_tag() -> &'static tag::Tag;
