@@ -23,7 +23,7 @@ macro_rules! asn1_info {
         asn1_typed!($rs_type: ($($gen)*), $asn_type);
     );
     ($rs_type:ty: ($($gen:tt)+) => $class:ident $tagnum:expr, $asn_type:expr) => (
-        asn1_tagged!($rs_type: ($($gen)+), $tag);
+        asn1_tagged!($rs_type: ($($gen)+), $class $tagnum);
         asn1_typed!($rs_type: ($($gen)+), $asn_type);
     );
     ($rs_type:ty => [$($args:tt)*], $asn_type:expr) => {
