@@ -5,16 +5,12 @@ use de;
 macro_rules! encode_int {
     ($ty:ty => $($args:tt)+) => {
         impl ser::Serialize for $ty {
-            fn asn1_serialize<S: ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Err> {
-                self._asn1_serialize_tagged(serializer, Self::asn1_tag())
-            }
-
             encode_int!{__impl $ty => $($args)*}
         }
     };
     (__impl $ty:ty => $ident:ident) => {
-        fn _asn1_serialize_tagged<S: ser::Serializer>(&self, serializer: S, tag: &Tag) -> Result<S::Ok, S::Err> {
-            serializer.$ident(tag, *self)
+        fn asn1_serialize<S: ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Err> {
+            serializer.$ident(*self)
         }
     };
 }
@@ -88,8 +84,8 @@ mod tests {
     {
         let mut buf: Vec<u8> = Vec::new();
         {
-            let mut serializer = ser::der::Serializer::from_vec(&mut buf);
-            v.asn1_serialize(&mut serializer).unwrap();
+            let mut serializer = ser::der::Serializer::new(&mut buf);
+            v.asn1_serialize(serializer).unwrap();
         }
         let mut deserializer = de::der::Deserializer::new(&buf[..]);
         T::asn1_deserialize(&mut deserializer).unwrap()
@@ -151,95 +147,77 @@ mod bench {
     use test;
     use ::ser::{der, Serialize as Asn1Serialize};
 
-    #[bench]
-    fn ser_i8(b: &mut test::Bencher) {
-
-        let mut writer = der::Serializer::new();
-        let v: i8 = -0x7f;
+    #[inline]
+    fn ser_helper<T: Asn1Serialize>(b: &mut test::Bencher, v: T){
+        let mut buf = Vec::with_capacity(128);
 
         b.iter(|| {
-            v.asn1_serialize(&mut writer).unwrap();
-            writer.clear()
+            {
+                let mut writer = der::Serializer::new(&mut buf);
+                v.asn1_serialize(writer).unwrap();
+            }
+            buf.clear()
         })
+    }
+
+    fn serialize<T: Asn1Serialize>(v: &T) -> Vec<u8> {
+        let mut buf = Vec::new();
+
+        {
+            let mut writer = der::Serializer::new(&mut buf);
+            v.asn1_serialize(writer).unwrap();
+        }
+
+        buf
+    }
+    #[bench]
+    fn ser_i8(b: &mut test::Bencher) {
+        let v: i8 = -0x7f;
+        ser_helper(b, v)
     }
 
     #[bench]
     fn ser_i16(b: &mut test::Bencher) {
-        
-        let mut writer = der::Serializer::new();
         let v: i16 = -0x7fff;
-
-        b.iter(|| {
-            v.asn1_serialize(&mut writer).unwrap();
-            writer.clear()
-        })
+        ser_helper(b, v)
     }
 
     #[bench]
     fn ser_i32(b: &mut test::Bencher) {
-        
-        let mut writer = der::Serializer::new();
         let v: i32 = -0x7fffffff;
-
-        b.iter(|| {
-            v.asn1_serialize(&mut writer).unwrap();
-            writer.clear()
-        })
+        ser_helper(b, v)
     }
 
     #[bench]
     fn ser_i64(b: &mut test::Bencher) {
-        
-        let mut writer = der::Serializer::new();
         let v: i64 = -0x7fffffffffffffff;
-
-        b.iter(|| {
-            v.asn1_serialize(&mut writer).unwrap();
-            writer.clear()
-        })
+        ser_helper(b, v)
     }
 
     #[bench]
     fn ser_u8(b: &mut test::Bencher) {
-        
-        let mut writer = der::Serializer::new();
         let v: u8 = 0x7f;
-
-        b.iter(|| {
-            v.asn1_serialize(&mut writer).unwrap();
-            writer.clear()
-        })
+        ser_helper(b, v)
     }
 
     #[bench]
     fn ser_u16(b: &mut test::Bencher) {
-        
-        let mut writer = der::Serializer::new();
         let v: u16 = 0x7fff;
-
-        b.iter(|| {
-            v.asn1_serialize(&mut writer).unwrap();
-            writer.clear()
-        })
+        ser_helper(b, v)
     }
 
     #[bench]
     fn ser_u32(b: &mut test::Bencher) {
-        
-        let mut writer = der::Serializer::new();
+    
         let v: u32 = 0x7fffffff;
-
-        b.iter(|| {
-            v.asn1_serialize(&mut writer).unwrap();
-            writer.clear()
-        })
+        ser_helper(b, v)
     }
 
     #[bench]
     fn ser_u64(b: &mut test::Bencher) {
-        
-        let mut writer = der::Serializer::new();
         let v: u64 = 0x7fffffffffffffff;
+        ser_helper(b, v)
+    }
 
         b.iter(|| {
             v.asn1_serialize(&mut writer).unwrap();
