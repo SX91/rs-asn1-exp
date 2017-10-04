@@ -4,7 +4,6 @@ use std::io::{Result as IoResult, Write};
 use info::tag::{Tag, Len, LenNum};
 
 
-
 pub unsafe fn _rwrite_base128(ptr: *mut u8, pos: usize, n: u64) -> usize {
     let mut n = n;
     let mut pos = pos as isize;
@@ -41,9 +40,9 @@ pub fn write_tag<W: Write>(w: &mut W, tag: &Tag) -> IoResult<()> {
     let tag_byte = tag.tag_byte();
 
     if tag.is_short() {
-        write_byte(w, tag_byte | tag.tagnum() as u8)
+        write_byte(w, tag_byte)
     } else {
-        write_byte(w, tag_byte | 0x1f)?;
+        write_byte(w, tag_byte)?;
         write_base128(w, tag.tagnum() as u64)
     }
 }
@@ -181,6 +180,16 @@ integer_write!(write_u32, u32, 4);
 integer_write!(write_u64, u64, 8);
 integer_write!(write_usize, usize, 8);
 
+#[allow(dead_code)]
+pub fn write_real32<W: Write>(_w: &mut W, _tag: &Tag, _value: f32) -> IoResult<()> {
+    unimplemented!()
+}
+
+#[allow(dead_code)]
+pub fn write_real64<W: Write>(_w: &mut W, _tag: &Tag, _value: f64) -> IoResult<()> {
+    unimplemented!()
+}
+
 pub fn write_bit_string<W: Write>(w: &mut W,
                                   tag: &Tag,
                                   unused_bits: u8,
@@ -256,7 +265,7 @@ pub fn write_object_identifier<W: Write>(w: &mut W, tag: &Tag, value: &[u64]) ->
 mod tests {
     use test;
     use super::*;
-    use info::Class;
+    use info::{Class, ContentType};
 
     fn buffer_eq_test<T, F>(test_set: &[(T, Vec<u8>)], mut f: F)
         where F: FnMut(&mut Vec<u8>, &T) -> IoResult<()>
@@ -287,11 +296,21 @@ mod tests {
     }
 
     #[test]
+    fn boolean_write() {
+        let tag = Tag::primitive(Class::Universal, 0x01);
+        let test_set = [(true, vec![0x01, 0x01, 0xff]),
+                        (false, vec![0x01, 0x01, 0x00])];
+
+        buffer_eq_test(&test_set[..], |buf, x| write_boolean(buf, &tag, *x))
+    }
+
+    #[test]
     fn i64_write() {
-        let tag = Tag::new(Class::Universal, 0x02, false);
+        let tag = Tag::primitive(Class::Universal, 0x02);
         let test_set = [(0x00, vec![0x02, 0x01, 0x00]),
                         (0x7f, vec![0x02, 0x01, 0x7f]),
                         (0xff, vec![0x02, 0x02, 0x00, 0xff]),
+                        (-0x01, vec![0x02, 0x01, 0xff]),
                         (0x7fff, vec![0x02, 0x02, 0x7f, 0xff]),
                         (0xffff, vec![0x02, 0x03, 0x00, 0xff, 0xff]),
                         (0x7fffffff, vec![0x02, 0x04, 0x7f, 0xff, 0xff, 0xff]),
@@ -310,7 +329,7 @@ mod tests {
 
     #[test]
     fn u64_write() {
-        let tag = Tag::new(Class::Universal, 0x02, false);
+        let tag = Tag::primitive(Class::Universal, 0x02);
         let test_set = [(0x00, vec![0x02, 0x01, 0x00]),
                         (0x7f, vec![0x02, 0x01, 0x7f]),
                         (0xff, vec![0x02, 0x02, 0x00, 0xff]),
@@ -330,7 +349,7 @@ mod tests {
     fn bits_write() {
         let test_set = [((vec![0xff, 0xff, 0xf0], 4), vec![0x03, 0x04, 0x04, 0xff, 0xff, 0xf0]),
                         ((vec![0xff, 0xff], 0), vec![0x03, 0x03, 0x00, 0xff, 0xff])];
-        let bit_string_tag = Tag::new(Class::Universal, 0x03, false);
+        let bit_string_tag = Tag::primitive(Class::Universal, 0x03);
 
         buffer_eq_test(&test_set[..], |buf, &(ref bits, unused)| {
             write_bit_string(buf, &bit_string_tag, unused, bits)
@@ -343,7 +362,7 @@ mod tests {
                         (vec![0x00, 0x03, 0x7f, 0x7f], vec![0x04, 0x03, 0x03, 0x7f, 0x7f]),
                         (vec![0x01, 0x03, 0x7fff, 0x7fff],
                          vec![0x04, 0x07, 0x2b, 0x81, 0xff, 0x7f, 0x81, 0xff, 0x7f])];
-        let oid_tag = Tag::new(Class::Universal, 0x04, false);
+        let oid_tag = Tag::primitive(Class::Universal, 0x04);
 
         buffer_eq_test(&test_set[..],
                        |buf, x| write_object_identifier(buf, &oid_tag, x))
@@ -353,7 +372,7 @@ mod tests {
     fn bench_tag(b: &mut test::Bencher) {
 
         let mut writer: Vec<u8> = Vec::with_capacity(128);
-        const V: Tag = Tag::const_new(Class::Universal, 0x02, false);
+        const V: Tag = Tag::const_new(Class::Universal, 0x02, ContentType::Primitive);
 
         b.iter(|| {
                    write_tag(&mut writer, &V).unwrap();
